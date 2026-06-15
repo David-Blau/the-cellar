@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#0A0806"/>
+<title>The Cellar</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{background:#0A0806;color:#E8DFD0;font-family:Georgia,'Times New Roman',serif;min-height:100vh;overscroll-behavior:none;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:#0A0806;}
+::-webkit-scrollbar-thumb{background:#2A2018;border-radius:2px;}
+input,select,textarea,button{font-family:Georgia,'Times New Roman',serif;}
+input::placeholder,textarea::placeholder{color:#3A2E1C;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#C9944A!important;box-shadow:0 0 0 2px rgba(201,148,74,0.1);}
+select option{background:#14100C;color:#E8DFD0;}
+.card{transition:border-color 0.14s,transform 0.14s;cursor:pointer;}
+.card:hover{border-color:#3A2E1A!important;transform:translateY(-1px);}
+.tab-btn{transition:all 0.14s;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.spin{animation:spin 0.9s linear infinite;}
+@keyframes scan-line{0%,100%{top:5%}50%{top:88%}}
+#setup-screen{display:none;}
+#setup-screen.show{display:flex;}
+#app{display:none;}
+#app.show{display:block;}
+@media(max-width:600px){
+  .hp{padding:14px!important;}
+  .mp{padding:14px!important;}
+  .g2{grid-template-columns:1fr!important;}
+  .g3{grid-template-columns:1fr 1fr!important;}
+  .gs{grid-template-columns:1fr 1fr!important;}
+  .hmob{display:none!important;}
+  #fab{display:flex!important;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP ══════════════════════════════════════════════════════════════ -->
+<div id="setup-screen" style="position:fixed;inset:0;background:#0A0806;z-index:1000;flex-direction:column;align-items:center;justify-content:center;padding:28px;overflow-y:auto;">
+  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#C9944A" stroke-width="1.6" stroke-linecap="round" style="margin-bottom:16px;flex-shrink:0;">
+    <path d="M8 2h8l1 7c0 3.31-2.69 6-6 6s-6-2.69-6-6L8 2z"/>
+    <path d="M12 15v7"/><path d="M8 22h8"/>
+  </svg>
+  <div style="font-size:24px;letter-spacing:0.14em;color:#D4A86A;margin-bottom:6px;">The Cellar</div>
+  <div style="font-size:10px;letter-spacing:0.22em;color:#4A3A20;text-transform:uppercase;margin-bottom:28px;">First-time setup</div>
+  <div style="width:100%;max-width:460px;">
+    <div style="font-size:13px;color:#6A5A3C;margin-bottom:22px;line-height:1.7;text-align:center;">
+      Enter your Anthropic API key to enable AI wine lookup.<br/>
+      <span style="color:#4A3A22;font-size:12px;">Your cellar data is stored automatically in the Railway database.</span>
+    </div>
+    <div style="margin-bottom:16px;">
+      <div style="font-size:10px;letter-spacing:0.18em;color:#5A4A2C;text-transform:uppercase;margin-bottom:6px;">Anthropic API Key</div>
+      <input id="setup-anth-key" type="password" placeholder="sk-ant-..."
+        style="width:100%;background:#14100C;border:1px solid #251E14;border-radius:6px;padding:11px 14px;color:#E8DFD0;font-size:14px;"/>
+      <div style="font-size:11px;color:#3A2E1A;margin-top:4px;">Get a free key at console.anthropic.com → API Keys</div>
+    </div>
+    <button onclick="saveSetup()" style="width:100%;background:#C9944A;color:#0A0806;border:none;border-radius:6px;padding:14px;font-size:15px;cursor:pointer;font-weight:bold;margin-bottom:10px;">
+      Open My Cellar
+    </button>
+    <button onclick="skipSetup()" style="width:100%;background:transparent;color:#5A4A2C;border:1px solid #1E1710;border-radius:6px;padding:12px;font-size:14px;cursor:pointer;">
+      Skip — no AI lookup
+    </button>
+  </div>
+</div>
+
+<!-- ══ MAIN APP ══════════════════════════════════════════════════════════ -->
+<div id="app">
+  <!-- Header -->
+  <header id="header" class="hp" style="padding:15px 22px;border-bottom:1px solid #1A1208;background:linear-gradient(180deg,#150F08 0%,#0A0806 100%);position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;">
+    <div id="logo" onclick="goBack()" style="display:flex;align-items:center;gap:11px;cursor:default;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#C9944A" stroke-width="1.6" stroke-linecap="round">
+        <path d="M8 2h8l1 7c0 3.31-2.69 6-6 6s-6-2.69-6-6L8 2z"/>
+        <path d="M12 15v7"/><path d="M8 22h8"/>
+      </svg>
+      <div>
+        <div style="font-size:19px;letter-spacing:0.14em;color:#D4A86A;">The Cellar</div>
+        <div style="font-size:9px;letter-spacing:0.22em;color:#4A3A20;text-transform:uppercase;">Wine Inventory</div>
+      </div>
+    </div>
+    <div id="header-actions" style="display:flex;gap:8px;align-items:center;">
+      <button onclick="openScanner()" style="display:flex;align-items:center;gap:6px;background:#1E1810;border:1px solid #2A2018;border-radius:6px;padding:9px 14px;color:#C9944A;cursor:pointer;font-size:13px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M3 9V5a2 2 0 012-2h4M3 15v4a2 2 0 002 2h4M15 3h4a2 2 0 012 2v4M15 21h4a2 2 0 002-2v-4"/>
+          <line x1="7" y1="7" x2="7" y2="17"/><line x1="10" y1="7" x2="10" y2="17"/><line x1="13" y1="7" x2="13" y2="17"/><line x1="16" y1="9" x2="16" y2="15"/>
+        </svg>
+        <span class="hmob">Scan</span>
+      </button>
+      <!-- Hidden file input for import -->
+      <input type="file" id="import-file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleImportFile(this)"/>
+      <button onclick="document.getElementById('import-file').click()" title="Import from Excel/CSV" style="display:flex;align-items:center;gap:6px;background:#1E1810;border:1px solid #2A2018;border-radius:6px;padding:9px 14px;color:#C9944A;cursor:pointer;font-size:13px;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <span class="hmob">Import</span>
+      </button>
+      <button id="add-btn" onclick="openAdd()" style="display:flex;align-items:center;gap:7px;background:#C9944A;color:#0A0806;border:none;border-radius:6px;padding:9px 16px;font-size:13px;cursor:pointer;font-weight:bold;letter-spacing:0.04em;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span class="hmob">Add Wine</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <div id="tabs" style="display:flex;border-bottom:1px solid #1A1208;background:#0D0A06;">
+    <button class="tab-btn" id="tab-inv" onclick="switchTab('inventory')" style="flex:1;padding:12px 16px;background:none;border:none;border-bottom:2px solid #C9944A;color:#C9944A;cursor:pointer;font-size:13px;letter-spacing:0.1em;text-transform:uppercase;">
+      Cellar (<span id="cnt-inv">0</span>)
+    </button>
+    <button class="tab-btn" id="tab-open" onclick="switchTab('opened')" style="flex:1;padding:12px 16px;background:none;border:none;border-bottom:2px solid transparent;color:#5A4A2C;cursor:pointer;font-size:13px;letter-spacing:0.1em;text-transform:uppercase;">
+      Opened (<span id="cnt-open">0</span>)
+    </button>
+  </div>
+
+  <!-- Sync indicator -->
+  <div id="sync-bar" style="display:none;background:#1A1408;border-bottom:1px solid #2A2010;padding:6px 22px;font-size:11px;color:#8A7040;letter-spacing:0.08em;text-align:center;">Syncing…</div>
+
+  <main class="mp" id="main" style="padding:20px 22px;max-width:1100px;margin:0 auto;padding-bottom:80px;"></main>
+
+  <button id="fab" onclick="openAdd()" style="display:none;position:fixed;bottom:22px;right:18px;width:54px;height:54px;border-radius:50%;background:#C9944A;border:none;cursor:pointer;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.65);z-index:99;color:#0A0806;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+</div>
+
+<!-- ══ SCANNER ════════════════════════════════════════════════════════════ -->
+<div id="scanner" style="display:none;position:fixed;inset:0;background:#000;z-index:500;flex-direction:column;">
+  <div style="position:relative;flex:1;overflow:hidden;">
+    <video id="scan-video" style="width:100%;height:100%;object-fit:cover;" muted playsinline autoplay></video>
+    <canvas id="scan-canvas" style="display:none;"></canvas>
+    <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;">
+      <div style="position:absolute;inset:0;background:rgba(0,0,0,0.5);"></div>
+      <div style="position:relative;width:72%;max-width:340px;aspect-ratio:2.5;z-index:1;">
+        <div style="position:absolute;inset:0;border:2px solid #C9944A;border-radius:6px;"></div>
+        <div style="position:absolute;left:0;right:0;height:2px;background:rgba(201,148,74,0.85);animation:scan-line 2s ease-in-out infinite;top:50%;"></div>
+      </div>
+      <div id="scan-msg" style="position:relative;z-index:1;margin-top:20px;color:#C9944A;font-size:13px;letter-spacing:0.1em;text-align:center;padding:0 20px;">Point at the barcode on the bottle</div>
+    </div>
+  </div>
+  <div style="background:#14100C;padding:18px 20px;border-top:1px solid #2A2018;">
+    <div id="scan-manual" style="display:none;margin-bottom:10px;">
+      <div style="display:flex;gap:8px;">
+        <input id="scan-input" placeholder="Type wine name to search…" onkeydown="if(event.key==='Enter')doManualSearch()"
+          style="flex:1;background:#0A0806;border:1px solid #2A2018;border-radius:6px;padding:11px 14px;color:#E8DFD0;font-size:14px;outline:none;font-family:Georgia,serif;"/>
+        <button onclick="doManualSearch()" style="background:#C9944A;color:#0A0806;border:none;border-radius:6px;padding:11px 18px;font-size:14px;cursor:pointer;font-weight:bold;font-family:Georgia,serif;">Search</button>
+      </div>
+      <button onclick="hideScanManual()" style="margin-top:8px;background:none;border:none;color:#5A4A2C;cursor:pointer;font-size:12px;width:100%;text-align:center;font-family:Georgia,serif;">← Back to scanner</button>
+    </div>
+    <div id="scan-btns" style="display:flex;gap:10px;">
+      <button onclick="showScanManual()" style="flex:1;background:#1E1810;border:1px solid #2A2018;border-radius:6px;padding:12px;color:#C9944A;font-size:13px;cursor:pointer;font-family:Georgia,serif;">Type name instead</button>
+      <button onclick="closeScanner()" style="flex:1;background:transparent;border:1px solid #2A2018;border-radius:6px;padding:12px;color:#6A5A3C;font-size:13px;cursor:pointer;font-family:Georgia,serif;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ LOOKUP OVERLAY ════════════════════════════════════════════════════ -->
+<div id="lookup" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:400;align-items:flex-end;justify-content:center;">
+  <div style="background:#14100C;border:1px solid #2A2018;border-radius:12px 12px 0 0;padding:24px 22px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto;">
+    <div id="lookup-body"></div>
+  </div>
+</div>
+
+<!-- ══ CONFIRM ════════════════════════════════════════════════════════════ -->
+<div id="confirm" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:200;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#1A130C;border:1px solid #3A1E1E;border-radius:12px;padding:26px;max-width:340px;width:100%;">
+    <div style="font-size:17px;margin-bottom:10px;color:#EAE0CF;">Remove wine?</div>
+    <div id="confirm-msg" style="font-size:14px;color:#5A4A2C;margin-bottom:22px;line-height:1.55;"></div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="doDelete()" style="flex:1;background:#6A1E1E;color:#F0D0D0;border:none;border-radius:6px;padding:12px;font-size:14px;cursor:pointer;font-weight:bold;font-family:Georgia,serif;">Remove</button>
+      <button onclick="G('confirm').style.display='none'" style="flex:1;background:transparent;color:#6A5A3C;border:1px solid #1E1710;border-radius:6px;padding:12px;font-size:14px;cursor:pointer;font-family:Georgia,serif;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ IMPORT MODAL ═════════════════════════════════════════════════════ -->
+<div id="import-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:300;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#14100C;border:1px solid #2A2018;border-radius:12px;padding:26px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;">
+    <div id="import-body"></div>
+  </div>
+</div>
+
+
+<div id="toast" style="display:none;position:fixed;bottom:26px;left:50%;transform:translateX(-50%);padding:10px 22px;border-radius:6px;font-size:13px;z-index:300;letter-spacing:0.04em;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,0.7);pointer-events:none;"></div>
+
+<script>
+// ══ CONSTANTS ══════════════════════════════════════════════════════════════
+const VARIETALS=['Cab Sauvignon','Merlot','Pinot Noir','Syrah/Shiraz','Zinfandel','Grenache','Malbec','Cabernet Franc','Petit Verdot','Sangiovese','Tempranillo','Nebbiolo','Chardonnay','Sauvignon Blanc','Riesling','Pinot Grigio','Viognier','Gewürztraminer','Chenin Blanc','Muscat','Rosé Blend','Sparkling Blend','Port','Sherry','Other'];
+const REGIONS=['Israel','France','Italy','Spain','USA','Argentina','Australia','Chile','Germany','Portugal','South Africa','New Zealand','Other'];
+const EW={id:'',company:'',wine:'',varietal:'',vintage:'',pPaid:'',store:'',region:'',rPrice:'',mevushal:'N',qty1:'',cooler1:'',shelf1:'',qty2:'',cooler2:'',shelf2:'',qty3:'',cooler3:'',shelf3:'',drinkFrom:'',drinkUntil:'',qprGG:'',notes:''};
+const SEED=[{id:'1',company:'Barkan',wine:'Superieur',varietal:'Cab Sauvignon',vintage:'2020',pPaid:'60',store:'',region:'Israel',rPrice:'70',mevushal:'Y',qty1:'7',cooler1:'4',shelf1:'2',qty2:'',cooler2:'',shelf2:'',qty3:'',cooler3:'',shelf3:'',drinkFrom:'2024',drinkUntil:'2028',qprGG:'85',notes:''}];
+
+// ══ STATE ══════════════════════════════════════════════════════════════════
+let wines=[], opened=[], tab='inventory', view='list';
+let sel=null, delPending=null, formData={...EW};
+let scanStream=null, scanRaf=null;
+
+const G=id=>document.getElementById(id);
+const tQ=w=>(Number(w.qty1)||0)+(Number(w.qty2)||0)+(Number(w.qty3)||0);
+const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// ══ SETUP ══════════════════════════════════════════════════════════════════
+async function saveSetup(){
+  const key=G('setup-anth-key').value.trim();
+  if(key){
+    await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:'anthropic_key',value:key})});
+  }
+  boot();
+}
+function skipSetup(){ boot(); }
+
+// ══ BOOT ═══════════════════════════════════════════════════════════════════
+async function boot(){
+  G('setup-screen').className='';
+  G('app').className='show';
+  showSync();
+  const [wRes,oRes]=await Promise.all([fetch('/api/wines'),fetch('/api/opened')]);
+  wines=await wRes.json();
+  opened=await oRes.json();
+  if(!Array.isArray(wines)) wines=[];
+  if(!Array.isArray(opened)) opened=[];
+  if(wines.length===0){
+    wines=SEED;
+    await fetch('/api/wines',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(SEED[0])});
+  }
+  hideSync();
+  renderList();
+}
+
+window.addEventListener('DOMContentLoaded',async()=>{
+  // Check if already configured (has data or settings)
+  try{
+    const r=await fetch('/api/settings');
+    const s=await r.json();
+    if(Object.keys(s).length>0 || true){ // Always check DB first
+      const wr=await fetch('/api/wines');
+      if(wr.ok){ boot(); return; }
+    }
+  }catch{}
+  G('setup-screen').className='show';
+});
+
+function showSync(){ G('sync-bar').style.display='block'; }
+function hideSync(){ G('sync-bar').style.display='none'; }
+
+// ══ TABS ═══════════════════════════════════════════════════════════════════
+function switchTab(t){
+  tab=t;
+  ['inv','open'].forEach(x=>{
+    const isThis=(t==='inventory'?x==='inv':x==='open');
+    G('tab-'+x).style.borderBottomColor=isThis?'#C9944A':'transparent';
+    G('tab-'+x).style.color=isThis?'#C9944A':'#5A4A2C';
+  });
+  G('add-btn').querySelector('span').textContent=t==='inventory'?'Add Wine':'Log Opened';
+  view='list'; renderList();
+}
+
+function setView(v){
+  view=v;
+  const isList=v==='list';
+  G('tabs').style.display=isList?'flex':'none';
+  G('header-actions').style.display=isList?'flex':'none';
+  G('fab').style.display=isList?'':'none';
+  G('logo').style.cursor=v!=='list'?'pointer':'default';
+}
+
+function goBack(){ if(view==='list') return; sel=null; view='list'; renderList(); }
+
+// ══ LIST ═══════════════════════════════════════════════════════════════════
+function renderList(){
+  setView('list');
+  const yr=new Date().getFullYear();
+  G('cnt-inv').textContent=wines.length;
+  G('cnt-open').textContent=opened.length;
+  const totalB=wines.reduce((s,w)=>s+tQ(w),0);
+  const totVal=wines.reduce((s,w)=>s+(Number(w.pPaid)||0)*tQ(w),0);
+  const mev=wines.filter(w=>w.mevushal==='Y').reduce((s,w)=>s+tQ(w),0);
+  const ready=wines.filter(w=>(!w.drinkFrom||Number(w.drinkFrom)<=yr)&&(!w.drinkUntil||Number(w.drinkUntil)>=yr)).reduce((s,w)=>s+tQ(w),0);
+
+  let cards='';
+  if(tab==='inventory'){
+    wines.forEach(w=>{
+      const q=tQ(w),dr=(!w.drinkFrom||Number(w.drinkFrom)<=yr)&&(!w.drinkUntil||Number(w.drinkUntil)>=yr);
+      cards+=`<div class="card" onclick="openDetail('${w.id}')" style="background:#14100C;border:1px solid #1E1710;border-radius:10px;overflow:hidden;">
+        <div style="height:3px;background:${dr?'#5A8A5A':'#C9944A'};"></div>
+        <div style="padding:14px 16px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+            <div style="min-width:0;"><div style="font-size:15px;color:#EAE0CF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.company)} ${esc(w.wine)}</div>
+            <div style="font-size:12px;color:#5A4A2C;margin-top:2px;">${esc(w.varietal)}${w.vintage?' · '+esc(w.vintage):''}</div></div>
+            ${w.mevushal==='Y'?'<span style="flex-shrink:0;font-size:9px;letter-spacing:0.1em;background:rgba(122,172,204,0.15);color:#7AACCC;padding:2px 7px;border-radius:3px;text-transform:uppercase;">Mev</span>':''}
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #1E1710;">
+            <span style="font-size:13px;color:#8A7A60;">🍾 ${q}</span>
+            <div>${w.qprGG?`<span style="font-size:11px;color:#6A5A3C;margin-right:10px;">QPR ${esc(w.qprGG)}</span>`:''}${w.rPrice?`<span style="font-size:12px;color:#C9944A;">$${esc(w.rPrice)}</span>`:''}</div>
+          </div>
+        </div>
+      </div>`;
+    });
+  } else {
+    opened.forEach(o=>{
+      cards+=`<div class="card" onclick="openOpenedDetail('${o.id}')" style="background:#14100C;border:1px solid #1E1710;border-radius:10px;padding:14px 16px;">
+        <div style="display:flex;justify-content:space-between;gap:8px;">
+          <div style="min-width:0;"><div style="font-size:15px;color:#EAE0CF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(o.company)} ${esc(o.wine)}</div>
+          <div style="font-size:12px;color:#5A4A2C;margin-top:2px;">${esc(o.varietal)}${o.vintage?' · '+esc(o.vintage):''}</div></div>
+          ${o.mevushal==='Y'?'<span style="flex-shrink:0;font-size:9px;background:rgba(122,172,204,0.15);color:#7AACCC;padding:2px 7px;border-radius:3px;text-transform:uppercase;">Mev</span>':''}
+        </div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #1E1710;display:flex;justify-content:space-between;">
+          <span style="font-size:11px;color:#4A3A22;">${esc(o.dateOpened||'Date unknown')}</span>
+          ${o.region?`<span style="font-size:11px;color:#4A3A22;">${esc(o.region)}</span>`:''}
+        </div>
+      </div>`;
+    });
+  }
+  if(!cards) cards=`<div style="text-align:center;padding:70px 20px;color:#3A2E1A;"><div style="font-size:48px;margin-bottom:12px;opacity:0.4;">🍷</div><div style="font-size:17px;color:#6A5A3C;margin-bottom:6px;">${tab==='inventory'?'Cellar is empty':'No opened wines yet'}</div><div style="font-size:13px;">Tap + to add one</div></div>`;
+
+  G('main').innerHTML=`
+    <div class="gs" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:20px;">
+      ${sc('Bottles',totalB,wines.length+' wines')}${sc('Value','$'+totVal.toLocaleString(),'at cost')}
+      ${sc('Ready',ready,'in drink window','#5A8A5A')}${sc('Mevushal',mev,'bottles','#7AACCC')}
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:180px;display:flex;align-items:center;gap:8px;background:#14100C;border:1px solid #1E1710;border-radius:6px;padding:9px 13px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5A4A2C" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="srch" oninput="filterCards()" placeholder="Search wines…" style="background:transparent;border:none;outline:none;color:#E8DFD0;font-size:14px;width:100%;font-family:Georgia,serif;"/>
+      </div>
+      ${tab==='inventory'?`<select id="srt" onchange="filterCards()" style="background:#14100C;border:1px solid #1E1710;border-radius:6px;padding:9px 12px;color:#E8DFD0;font-size:13px;cursor:pointer;font-family:Georgia,serif;"><option value="company">A–Z</option><option value="vintage">Vintage</option><option value="qty">Qty</option><option value="qpr">QPR</option></select>`:''}
+    </div>
+    <div id="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;">${cards}</div>`;
+}
+
+function sc(l,v,s,a='#C9944A'){return`<div style="background:#14100C;border:1px solid #1E1710;border-radius:8px;padding:13px 15px;"><div style="font-size:10px;letter-spacing:0.18em;color:#5A4A2C;text-transform:uppercase;margin-bottom:3px;">${l}</div><div style="font-size:22px;color:${a};line-height:1.15;">${v}</div><div style="font-size:11px;color:#3A2E1A;margin-top:2px;">${s}</div></div>`;}
+
+function filterCards(){
+  const q=(G('srch')?.value||'').toLowerCase();
+  const srt=G('srt')?.value||'company';
+  const yr=new Date().getFullYear();
+  let list=tab==='inventory'?[...wines]:[...opened];
+  if(q) list=list.filter(w=>[w.company,w.wine,w.varietal,w.region].some(s=>s?.toLowerCase().includes(q)));
+  if(tab==='inventory') list.sort((a,b)=>{
+    if(srt==='company') return `${a.company} ${a.wine}`.localeCompare(`${b.company} ${b.wine}`);
+    if(srt==='vintage') return (b.vintage||'').localeCompare(a.vintage||'');
+    if(srt==='qty')     return tQ(b)-tQ(a);
+    if(srt==='qpr')     return (Number(b.qprGG)||0)-(Number(a.qprGG)||0);
+    return 0;
+  });
+  let cards='';
+  const yr2=new Date().getFullYear();
+  if(tab==='inventory'){
+    list.forEach(w=>{
+      const q2=tQ(w),dr=(!w.drinkFrom||Number(w.drinkFrom)<=yr2)&&(!w.drinkUntil||Number(w.drinkUntil)>=yr2);
+      cards+=`<div class="card" onclick="openDetail('${w.id}')" style="background:#14100C;border:1px solid #1E1710;border-radius:10px;overflow:hidden;"><div style="height:3px;background:${dr?'#5A8A5A':'#C9944A'};"></div><div style="padding:14px 16px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;"><div style="min-width:0;"><div style="font-size:15px;color:#EAE0CF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.company)} ${esc(w.wine)}</div><div style="font-size:12px;color:#5A4A2C;margin-top:2px;">${esc(w.varietal)}${w.vintage?' · '+esc(w.vintage):''}</div></div>${w.mevushal==='Y'?'<span style="flex-shrink:0;font-size:9px;background:rgba(122,172,204,0.15);color:#7AACCC;padding:2px 7px;border-radius:3px;text-transform:uppercase;">Mev</span>':''}</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #1E1710;"><span style="font-size:13px;color:#8A7A60;">🍾 ${q2}</span><div>${w.qprGG?`<span style="font-size:11px;color:#6A5A3C;margin-right:10px;">QPR ${esc(w.qprGG)}</span>`:''}${w.rPrice?`<span style="font-size:12px;color:#C9944A;">$${esc(w.rPrice)}</span>`:''}</div></div></div></div>`;
+    });
+  } else {
+    list.forEach(o=>{
+      cards+=`<div class="card" onclick="openOpenedDetail('${o.id}')" style="background:#14100C;border:1px solid #1E1710;border-radius:10px;padding:14px 16px;"><div style="display:flex;justify-content:space-between;gap:8px;"><div style="min-width:0;"><div style="font-size:15px;color:#EAE0CF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(o.company)} ${esc(o.wine)}</div><div style="font-size:12px;color:#5A4A2C;margin-top:2px;">${esc(o.varietal)}${o.vintage?' · '+esc(o.vintage):''}</div></div>${o.mevushal==='Y'?'<span style="flex-shrink:0;font-size:9px;background:rgba(122,172,204,0.15);color:#7AACCC;padding:2px 7px;border-radius:3px;text-transform:uppercase;">Mev</span>':''}</div><div style="margin-top:10px;padding-top:10px;border-top:1px solid #1E1710;display:flex;justify-content:space-between;"><span style="font-size:11px;color:#4A3A22;">${esc(o.dateOpened||'Date unknown')}</span>${o.region?`<span style="font-size:11px;color:#4A3A22;">${esc(o.region)}</span>`:''}</div></div>`;
+    });
+  }
+  if(!cards) cards=`<div style="text-align:center;padding:60px 20px;color:#4A3A22;"><div style="font-size:40px;margin-bottom:10px;opacity:0.3;">🍷</div><div>No wines match</div></div>`;
+  G('grid').innerHTML=cards;
+}
+
+// ══ DETAIL ════════════════════════════════════════════════════════════════
+function mi(l,v){return`<div style="background:#14100C;border:1px solid #1E1710;border-radius:6px;padding:10px 12px;"><div style="font-size:9px;letter-spacing:0.18em;color:#4A3A22;text-transform:uppercase;margin-bottom:3px;">${l}</div><div style="font-size:15px;color:#D0C0A0;">${esc(v)||'—'}</div></div>`;}
+
+function openDetail(id){
+  const w=wines.find(x=>x.id===id); if(!w) return;
+  sel=w; setView('detail');
+  const yr=new Date().getFullYear(),q=tQ(w),val=(Number(w.pPaid)||0)*q;
+  const dr=(!w.drinkFrom||Number(w.drinkFrom)<=yr)&&(!w.drinkUntil||Number(w.drinkUntil)>=yr);
+  const locs=[[w.qty1,w.cooler1,w.shelf1],[w.qty2,w.cooler2,w.shelf2],[w.qty3,w.cooler3,w.shelf3]];
+  const locH=locs.some(([q])=>q)?`<div style="background:#14100C;border:1px solid #1E1710;border-radius:8px;padding:13px 15px;margin-bottom:15px;"><div style="font-size:10px;letter-spacing:0.18em;color:#5A4A2C;text-transform:uppercase;margin-bottom:8px;">Bottle Locations</div>${locs.map(([q,c,s],i)=>q||c||s?`<div style="display:flex;gap:14px;font-size:14px;color:#C8B89A;margin-top:${i?'6px':'0'};"><span style="color:#5A4A2C;font-size:12px;">Slot ${i+1}:</span>${q?`<span>${q} bottles</span>`:''}${c?`<span>· Cooler ${esc(c)}</span>`:''}${s?`<span>· Shelf ${esc(s)}</span>`:''}</div>`:'').join('')}</div>`:'';
+  G('main').innerHTML=`
+    <button onclick="goBack()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#5A4A2C;cursor:pointer;font-size:13px;margin-bottom:22px;padding:0;font-family:Georgia,serif;">← Back</button>
+    <div style="border-left:3px solid ${dr?'#5A8A5A':'#C9944A'};padding-left:14px;margin-bottom:22px;">
+      <div style="font-size:10px;letter-spacing:0.2em;color:${dr?'#5A8A5A':'#C9944A'};text-transform:uppercase;margin-bottom:4px;">${dr?'Ready to drink':'Cellar'}</div>
+      <h1 style="font-size:24px;font-weight:normal;color:#EAE0CF;line-height:1.25;margin-bottom:4px;">${esc(w.company)} ${esc(w.wine)}</h1>
+      <div style="font-size:14px;color:#5A4A2C;">${esc(w.varietal)}${w.vintage?' · '+esc(w.vintage):''}${w.region?' · '+esc(w.region):''}</div>
+      ${w.mevushal==='Y'?'<span style="display:inline-block;margin-top:8px;font-size:10px;letter-spacing:0.12em;background:rgba(122,172,204,0.15);color:#7AACCC;padding:3px 9px;border-radius:3px;text-transform:uppercase;">Mevushal</span>':''}
+    </div>
+    <div class="g3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-bottom:18px;">
+      ${mi('Total Bottles',q)}${mi('Price Paid',w.pPaid?'$'+w.pPaid:'')}${mi('Retail Price',w.rPrice?'$'+w.rPrice:'')}
+      ${mi('Collection Value',val?'$'+val.toLocaleString():'')}${mi('Store',w.store)}${mi('QPR',w.qprGG)}
+      ${mi('Drink From',w.drinkFrom)}${mi('Drink Until',w.drinkUntil)}
+    </div>
+    ${locH}
+    ${w.notes?`<div style="background:#14100C;border:1px solid #1E1710;border-radius:8px;padding:13px 15px;margin-bottom:18px;"><div style="font-size:10px;letter-spacing:0.18em;color:#5A4A2C;text-transform:uppercase;margin-bottom:6px;">Notes</div><div style="font-size:14px;line-height:1.7;color:#C8B89A;">${esc(w.notes)}</div></div>`:''}
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button onclick="openEdit()" style="display:flex;align-items:center;gap:7px;background:#C9944A;color:#0A0806;border:none;border-radius:6px;padding:11px 20px;font-size:14px;cursor:pointer;font-weight:bold;font-family:Georgia,serif;">✏ Edit</button>
+      ${q>0?`<button onclick="markOpened('${w.id}')" style="background:transparent;color:#7AACCC;border:1px solid rgba(122,172,204,0.4);border-radius:6px;padding:11px 20px;font-size:14px;cursor:pointer;font-family:Georgia,serif;">🍷 Mark Opened</button>`:''}
+      <button onclick="showConfirm('${w.id}','wine')" style="background:transparent;color:#8A3030;border:1px solid #2A1818;border-radius:6px;padding:11px 20px;font-size:14px;cursor:pointer;font-family:Georgia,serif;">🗑 Remove</button>
+    </div>`;
+}
+
+function openOpenedDetail(id){
+  const o=opened.find(x=>x.id===id); if(!o) return;
+  sel=o; setView('detail');
+  G('main').innerHTML=`
+    <button onclick="goBack()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#5A4A2C;cursor:pointer;font-size:13px;margin-bottom:22px;padding:0;font-family:Georgia,serif;">← Back</button>
+    <div style="border-left:3px solid #C9944A;padding-left:14px;margin-bottom:22px;">
+      ${o.dateOpened?`<div style="font-size:10px;letter-spacing:0.2em;color:#C9944A;text-transform:uppercase;margin-bottom:4px;">Opened ${esc(o.dateOpened)}</div>`:''}
+      <h1 style="font-size:24px;font-weight:normal;color:#EAE0CF;line-height:1.25;margin-bottom:4px;">${esc(o.company)} ${esc(o.wine)}</h1>
+      <div style="font-size:14px;color:#5A4A2C;">${esc(o.varietal)}${o.vintage?' · '+esc(o.vintage):''}${o.region?' · '+esc(o.region):''}</div>
+      ${o.mevushal==='Y'?'<span style="display:inline-block;margin-top:8px;font-size:10px;background:rgba(122,172,204,0.15);color:#7AACCC;padding:3px 9px;border-radius:3px;text-transform:uppercase;">Mevushal</span>':''}
+    </div>
+    <div class="g3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-bottom:18px;">
+      ${mi('Price Paid',o.pPaid?'$'+o.pPaid:'')}${mi('Retail Price',o.rPrice?'$'+o.rPrice:'')}${mi('Store',o.store)}${mi('Region',o.region)}
+    </div>
+    ${o.notes?`<div style="background:#14100C;border:1px solid #1E1710;border-radius:8px;padding:13px 15px;margin-bottom:18px;"><div style="font-size:10px;letter-spacing:0.18em;color:#5A4A2C;text-transform:uppercase;margin-bottom:6px;">Notes</div><div style="font-size:14px;line-height:1.7;color:#C8B89A;">${esc(o.notes)}</div></div>`:''}
+    <div style="display:flex;gap:10px;">
+      <button onclick="openEditOpened()" style="background:#C9944A;color:#0A0806;border:none;border-radius:6px;padding:11px 20px;font-size:14px;cursor:pointer;font-weight:bold;font-family:Georgia,serif;">✏ Edit</button>
+      <button onclick="showConfirm('${o.id}','opened')" style="background:transparent;color:#8A3030;border:1px solid #2A1818;border-radius:6px;padding:11px 20px;font-size:14px;cursor:pointer;font-family:Georgia,serif;">🗑 Remove</button>
+    </div>`;
+}
+
+// ══ FORM ══════════════════════════════════════════════════════════════════
+function fld(l,h){return`<div style="margin-bottom:16px;"><div style="font-size:10px;letter-spacing:0.18em;color:#5A4A2C;text-transform:uppercase;margin-bottom:5px;">${l}</div>${h}</div>`;}
+function istyle(extra=''){return`style="width:100%;background:#14100C;border:1px solid #251E14;border-radius:6px;padding:10px 13px;color:#E8DFD0;font-size:14px;font-family:Georgia,serif;${extra}"`;}
+function vOpts(cur){return VARIETALS.map(v=>`<option${v===cur?' selected':''}>${esc(v)}</option>`).join('');}
+function rOpts(cur){return REGIONS.map(r=>`<option${r===cur?' selected':''}>${esc(r)}</option>`).join('');}
+
+function openAdd(){ sel=null; formData={...EW}; tab==='inventory'?renderForm():renderOpenedForm(); }
+function openEdit(){ formData={...sel}; renderForm(); }
+function openEditOpened(){ formData={...sel}; renderOpenedForm(); }
+
+function renderForm(){
+  setView('form');
+  const f=formData, isEdit=!!sel;
+  G('main').innerHTML=`
+    <button onclick="goBack()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#5A4A2C;cursor:pointer;font-size:13px;margin-bottom:20px;padding:0;font-family:Georgia,serif;">← Back</button>
+    <div style="font-size:20px;color:#C9944A;letter-spacing:0.1em;margin-bottom:20px;">${isEdit?'Edit Wine':'Add to Cellar'}</div>
+    ${!isEdit?`<button onclick="openScanner()" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#1E1810;border:1px solid #C9944A;border-radius:6px;padding:12px;color:#C9944A;cursor:pointer;font-size:13px;width:100%;margin-bottom:20px;font-family:Georgia,serif;">📷 Scan barcode to auto-fill</button>`:''}
+    <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      ${fld('Company *',`<input value="${esc(f.company)}" placeholder="Barkan" oninput="formData.company=this.value" ${istyle()}>`)}
+      ${fld('Wine Name *',`<input value="${esc(f.wine)}" placeholder="Superieur" oninput="formData.wine=this.value" ${istyle()}>`)}
+    </div>
+    <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      ${fld('Varietal',`<select onchange="formData.varietal=this.value" ${istyle('cursor:pointer;')}><option value="">Select</option>${vOpts(f.varietal)}</select>`)}
+      ${fld('Vintage',`<input value="${esc(f.vintage)}" placeholder="2020" oninput="formData.vintage=this.value" ${istyle()}>`)}
+    </div>
+    <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      ${fld('Region',`<select onchange="formData.region=this.value" ${istyle('cursor:pointer;')}><option value="">Select</option>${rOpts(f.region)}</select>`)}
+      ${fld('Store',`<input value="${esc(f.store)}" placeholder="Kosherwine.com" oninput="formData.store=this.value" ${istyle()}>`)}
+    </div>
+    <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      ${fld('Price Paid / bottle ($)',`<input type="number" value="${esc(f.pPaid)}" placeholder="0.00" oninput="formData.pPaid=this.value" ${istyle()}>`)}
+      ${fld('Retail Price ($)',`<input type="number" value="${esc(f.rPrice)}" placeholder="0.00" oninput="formData.rPrice=this.value" ${istyle()}>`)}
+    </div>
+    <div style="margin-bottom:16px;">
+      <div style="font-size:10px;letter-spacing:0.18em;color:#5A4A2C;text-transform:uppercase;margin-bottom:6px;">Mevushal</div>
+      <div style="display:flex;gap:10px;">
+        <button id="mev-y" onclick="setMev('Y')" style="flex:1;padding:10px;border-radius:6px;border:1px solid ${f.mevushal==='Y'?'#7AACCC':'#1E1710'};background:${f.mevushal==='Y'?'rgba(122,172,204,0.15)':'transparent'};color:${f.mevushal==='Y'?'#7AACCC':'#5A4A2C'};cursor:pointer;font-size:14px;font-family:Georgia,serif;">Yes — Mevushal</button>
+        <button id="mev-n" onclick="setMev('N')" style="flex:1;padding:10px;border-radius:6px;border:1px solid ${f.mevushal==='N'?'#7AACCC':'#1E1710'};background:${f.mevushal==='N'?'rgba(122,172,204,0.15)':'transparent'};color:${f.mevushal==='N'?'#7AACCC':'#5A4A2C'};cursor:pointer;font-size:14px;font-family:Georgia,serif;">No</button>
+      </div>
+    </div>
+    <div style="margin-bottom:18px;">
+      <div style="font-size:10px;letter-spacing:0.18em;color:#5A4A2C;text-transform:uppercase;margin-bottom:8px;">Bottle Locations (up to 3 storage spots)</div>
+      ${[1,2,3].map(n=>`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div>${n===1?'<div style="font-size:9px;letter-spacing:0.18em;color:#5A4A2C;text-transform:uppercase;margin-bottom:4px;">Qty</div>':''}<input type="number" min="0" value="${esc(f['qty'+n])}" placeholder="Slot ${n}" oninput="formData.qty${n}=this.value" style="width:100%;background:#14100C;border:1px solid #251E14;border-radius:6px;padding:10px 10px;color:#E8DFD0;font-size:13px;font-family:Georgia,serif;"/></div>
+        <div>${n===1?'<div style="font-size:9px;letter-spacing:0.18em;color:#5A4A2C;text-transform:uppercase;margin-bottom:4px;">Cooler #</div>':''}<input value="${esc(f['cooler'+n])}" placeholder="Cooler" oninput="formData.cooler${n}=this.value" style="width:100%;background:#14100C;border:1px solid #251E14;border-radius:6px;padding:10px 10px;color:#E8DFD0;font-size:13px;font-family:Georgia,serif;"/></div>
+        <div>${n===1?'<div style="font-size:9px;letter-spacing:0.18em;color:#5A4A2C;text-transform:uppercase;margin-bottom:4px;">Shelf #</div>':''}<input value="${esc(f['shelf'+n])}" placeholder="Shelf" oninput="formData.shelf${n}=this.value" style="width:100%;background:#14100C;border:1px solid #251E14;border-radius:6px;padding:10px 10px;color:#E8DFD0;font-size:13px;font-family:Georgia,serif;"/></div>
+      </div>`).join('')}
+    </div>
+    <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      ${fld('Drink From (year)',`<input value="${esc(f.drinkFrom)}" placeholder="2024" oninput="formData.drinkFrom=this.value" ${istyle()}>`)}
+      ${fld('Drink Until (year)',`<input value="${esc(f.drinkUntil)}" placeholder="2028" oninput="formData.drinkUntil=this.value" ${istyle()}>`)}
+    </div>
+    ${fld('QPR GG (score)',`<input type="number" value="${esc(f.qprGG)}" placeholder="85" oninput="formData.qprGG=this.value" style="width:50%;background:#14100C;border:1px solid #251E14;border-radius:6px;padding:10px 13px;color:#E8DFD0;font-size:14px;font-family:Georgia,serif;">`)}
+    ${fld('Notes',`<textarea rows="3" oninput="formData.notes=this.value" placeholder="Tasting notes…" style="width:100%;background:#14100C;border:1px solid #251E14;border-radius:6px;padding:10px 13px;color:#E8DFD0;font-size:14px;resize:vertical;font-family:Georgia,serif;">${esc(f.notes)}</textarea>`)}
+    <div style="display:flex;gap:10px;flex-wrap:wrap;padding-bottom:50px;margin-top:8px;">
+      <button onclick="saveWineForm()" style="background:#C9944A;color:#0A0806;border:none;border-radius:6px;padding:12px 26px;font-size:15px;cursor:pointer;font-weight:bold;flex:1;min-width:120px;font-family:Georgia,serif;">Save</button>
+      <button onclick="goBack()" style="background:transparent;color:#5A4A2C;border:1px solid #1E1710;border-radius:6px;padding:12px 20px;font-size:15px;cursor:pointer;font-family:Georgia,serif;">Cancel</button>
+    </div>`;
+}
+
+function renderOpenedForm(){
+  setView('form');
+  const f=formData, isEdit=!!sel;
+  G('main').innerHTML=`
+    <button onclick="goBack()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#5A4A2C;cursor:pointer;font-size:13px;margin-bottom:20px;padding:0;font-family:Georgia,serif;">← Back</button>
+    <div style="font-size:20px;color:#C9944A;letter-spacing:0.1em;margin-bottom:20px;">${isEdit?'Edit Entry':'Log Opened Bottle'}</div>
+    ${fld('Date Opened',`<input type="date" value="${esc(f.dateOpened)}" oninput="formData.dateOpened=this.value" ${istyle()}>`)}
+    <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      ${fld('Company',`<input value="${esc(f.company)}" placeholder="Barkan" oninput="formData.company=this.value" ${istyle()}>`)}
+      ${fld('Wine Name *',`<input value="${esc(f.wine)}" placeholder="Superieur" oninput="formData.wine=this.value" ${istyle()}>`)}
+    </div>
+    <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      ${fld('Varietal',`<select onchange="formData.varietal=this.value" ${istyle('cursor:pointer;')}><option value="">Select</option>${vOpts(f.varietal)}</select>`)}
+      ${fld('Vintage',`<input value="${esc(f.vintage)}" placeholder="2020" oninput="formData.vintage=this.value" ${istyle()}>`)}
+    </div>
+    <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      ${fld('Region',`<select onchange="formData.region=this.value" ${istyle('cursor:pointer;')}><option value="">Select</option>${rOpts(f.region)}</select>`)}
+      ${fld('Store',`<input value="${esc(f.store)}" oninput="formData.store=this.value" ${istyle()}>`)}
+    </div>
+    <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      ${fld('Price Paid ($)',`<input type="number" value="${esc(f.pPaid)}" oninput="formData.pPaid=this.value" ${istyle()}>`)}
+      ${fld('Retail Price ($)',`<input type="number" value="${esc(f.rPrice)}" oninput="formData.rPrice=this.value" ${istyle()}>`)}
+    </div>
+    <div style="margin-bottom:16px;">
+      <div style="font-size:10px;letter-spacing:0.18em;color:#5A4A2C;text-transform:uppercase;margin-bottom:6px;">Mevushal</div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="setMev('Y')" style="flex:1;padding:10px;border-radius:6px;border:1px solid ${f.mevushal==='Y'?'#7AACCC':'#1E1710'};background:${f.mevushal==='Y'?'rgba(122,172,204,0.15)':'transparent'};color:${f.mevushal==='Y'?'#7AACCC':'#5A4A2C'};cursor:pointer;font-size:14px;font-family:Georgia,serif;">Yes</button>
+        <button onclick="setMev('N')" style="flex:1;padding:10px;border-radius:6px;border:1px solid ${f.mevushal==='N'?'#7AACCC':'#1E1710'};background:${f.mevushal==='N'?'rgba(122,172,204,0.15)':'transparent'};color:${f.mevushal==='N'?'#7AACCC':'#5A4A2C'};cursor:pointer;font-size:14px;font-family:Georgia,serif;">No</button>
+      </div>
+    </div>
+    ${fld('Notes',`<textarea rows="3" oninput="formData.notes=this.value" placeholder="Notes…" style="width:100%;background:#14100C;border:1px solid #251E14;border-radius:6px;padding:10px 13px;color:#E8DFD0;font-size:14px;resize:vertical;font-family:Georgia,serif;">${esc(f.notes)}</textarea>`)}
+    <div style="display:flex;gap:10px;padding-bottom:50px;margin-top:8px;">
+      <button onclick="saveOpenedForm()" style="background:#C9944A;color:#0A0806;border:none;border-radius:6px;padding:12px 26px;font-size:15px;cursor:pointer;font-weight:bold;flex:1;font-family:Georgia,serif;">Save</button>
+      <button onclick="goBack()" style="background:transparent;color:#5A4A2C;border:1px solid #1E1710;border-radius:6px;padding:12px 20px;font-size:15px;cursor:pointer;font-family:Georgia,serif;">Cancel</button>
+    </div>`;
+}
+
+function setMev(v){ formData.mevushal=v; tab==='inventory'?renderForm():renderOpenedForm(); }
+function prefillForm(d){ Object.assign(formData,d); tab==='inventory'?renderForm():renderOpenedForm(); closeLookup(); showToast('Form pre-filled — review and save.'); }
+
+async function saveWineForm(){
+  if(!formData.company.trim()){showToast('Company is required.','err');return;}
+  if(!formData.wine.trim()){showToast('Wine name is required.','err');return;}
+  showSync();
+  if(sel){ formData.id=sel.id; wines=wines.map(w=>w.id===sel.id?{...formData}:w); showToast(`${formData.company} ${formData.wine} updated.`); }
+  else { formData.id=Date.now().toString(); wines.unshift({...formData}); showToast(`${formData.company} ${formData.wine} added.`); }
+  await fetch('/api/wines',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(formData)});
+  hideSync(); goBack();
+}
+async function saveOpenedForm(){
+  if(!formData.wine.trim()){showToast('Wine name is required.','err');return;}
+  showSync();
+  if(sel){ formData.id=sel.id; opened=opened.map(o=>o.id===sel.id?{...formData}:o); showToast(`${formData.wine} updated.`); }
+  else { formData.id=Date.now().toString(); opened.unshift({...formData}); showToast(`${formData.wine} logged.`); }
+  await fetch('/api/opened',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(formData)});
+  hideSync(); goBack();
+}
+
+// ══ MARK OPENED ════════════════════════════════════════════════════════════
+async function markOpened(id){
+  const w=wines.find(x=>x.id===id); if(!w) return;
+  const entry={id:Date.now().toString(),dateOpened:new Date().toISOString().slice(0,10),company:w.company,wine:w.wine,varietal:w.varietal,vintage:w.vintage,pPaid:w.pPaid,store:w.store,region:w.region,rPrice:w.rPrice,mevushal:w.mevushal,notes:''};
+  opened.unshift(entry);
+  if(tQ(w)>0){
+    const u={...w};
+    if((Number(u.qty1)||0)>0) u.qty1=String((Number(u.qty1)||0)-1);
+    else if((Number(u.qty2)||0)>0) u.qty2=String((Number(u.qty2)||0)-1);
+    else if((Number(u.qty3)||0)>0) u.qty3=String((Number(u.qty3)||0)-1);
+    wines=wines.map(x=>x.id===id?u:x);
+    showSync();
+    await Promise.all([
+      fetch('/api/wines',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(u)}),
+      fetch('/api/opened',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(entry)})
+    ]);
+    hideSync();
+  }
+  showToast(`${w.wine} logged as opened.`); goBack();
+}
+
+// ══ DELETE ════════════════════════════════════════════════════════════════
+function showConfirm(id,type){
+  delPending={id,type};
+  const item=type==='wine'?wines.find(x=>x.id===id):opened.find(x=>x.id===id);
+  G('confirm-msg').innerHTML=`<strong style="color:#C8B89A">${esc(item?.company||'')} ${esc(item?.wine||'')}</strong> will be permanently removed.`;
+  G('confirm').style.display='flex';
+}
+async function doDelete(){
+  if(!delPending) return;
+  showSync();
+  if(delPending.type==='wine'){
+    wines=wines.filter(w=>w.id!==delPending.id);
+    await fetch('/api/wines/'+delPending.id,{method:'DELETE'});
+  } else {
+    opened=opened.filter(o=>o.id!==delPending.id);
+    await fetch('/api/opened/'+delPending.id,{method:'DELETE'});
+  }
+  hideSync(); G('confirm').style.display='none'; delPending=null; showToast('Removed.'); goBack();
+}
+
+// ══ SCANNER ═══════════════════════════════════════════════════════════════
+async function openScanner(){
+  G('scanner').style.display='flex';
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}}});
+    scanStream=stream;
+    const v=G('scan-video'); v.srcObject=stream; await v.play();
+    scanLoop();
+  }catch(e){
+    G('scan-msg').textContent='Camera unavailable — type the wine name below';
+    showScanManual();
+  }
+}
+async function scanLoop(){
+  const v=G('scan-video'),c=G('scan-canvas');
+  if(!v||!c||v.readyState<2){scanRaf=requestAnimationFrame(scanLoop);return;}
+  c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);
+  if(window.BarcodeDetector){
+    try{
+      const det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39']});
+      const codes=await det.detect(c);
+      if(codes.length>0){closeScanner();handleBarcode(codes[0].rawValue);return;}
+    }catch{}
+  }
+  scanRaf=requestAnimationFrame(scanLoop);
+}
+function closeScanner(){
+  cancelAnimationFrame(scanRaf);
+  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
+  G('scanner').style.display='none';
+  G('scan-manual').style.display='none';
+  G('scan-btns').style.display='flex';
+  G('scan-input').value='';
+}
+function showScanManual(){G('scan-manual').style.display='block';G('scan-btns').style.display='none';setTimeout(()=>G('scan-input').focus(),100);}
+function hideScanManual(){G('scan-manual').style.display='none';G('scan-btns').style.display='flex';}
+function doManualSearch(){const v=G('scan-input').value.trim();if(!v)return;closeScanner();doLookup(v);}
+
+async function handleBarcode(code){
+  showLookupLoading('Looking up barcode…');
+  try{
+    const r=await fetch('/api/barcode/'+code);
+    const d=await r.json();
+    await doLookup(d.found&&d.name?d.name:code);
+  }catch{await doLookup(code);}
+}
+async function doLookup(query){
+  showLookupLoading('Searching for "'+query+'"…');
+  try{
+    const r=await fetch('/api/lookup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query})});
+    if(!r.ok){const e=await r.json();showLookupNotFound(e.error||'');return;}
+    const d=await r.json();
+    if(d&&d.company) showLookupResult(d);
+    else showLookupNotFound('');
+  }catch(e){showLookupNotFound(e.message);}
+}
+
+function showLookupLoading(msg){
+  G('lookup').style.display='flex';
+  G('lookup-body').innerHTML=`<div style="text-align:center;padding:30px 0;">
+    <div style="width:38px;height:38px;border:2px solid #C9944A;border-top-color:transparent;border-radius:50%;margin:0 auto 16px;animation:spin 0.8s linear infinite;"></div>
+    <div style="color:#C9944A;font-size:14px;letter-spacing:0.08em;">${esc(msg)}</div>
+    <div style="color:#4A3A22;font-size:12px;margin-top:6px;">Checking kosherwine.com &amp; royalwine.com</div>
+  </div>`;
+}
+function showLookupNotFound(err){
+  G('lookup-body').innerHTML=`<div style="text-align:center;padding:24px 0;">
+    <div style="font-size:32px;margin-bottom:12px;opacity:0.4;">🍷</div>
+    <div style="font-size:16px;color:#8A7A60;margin-bottom:8px;">Wine not found</div>
+    <div style="font-size:13px;color:#4A3A22;margin-bottom:20px;">${err?esc(err):'Could not find this wine. Fill in the details manually.'}</div>
+    <button onclick="closeLookup()" style="background:#C9944A;color:#0A0806;border:none;border-radius:6px;padding:12px 24px;font-size:14px;cursor:pointer;font-weight:bold;font-family:Georgia,serif;">Enter manually</button>
+  </div>`;
+}
+function showLookupResult(r){
+  const rows=[['Company',r.company],['Wine',r.wine],['Varietal',r.varietal],['Vintage',r.vintage],['Region',r.region],['Retail Price',r.rPrice?'$'+r.rPrice:''],['Mevushal',r.mevushal==='Y'?'Yes':'No'],['Drink Window',r.drinkFrom&&r.drinkUntil?r.drinkFrom+'–'+r.drinkUntil:'']]
+    .map(([l,v])=>`<div style="background:#0A0806;border-radius:6px;padding:9px 11px;"><div style="font-size:9px;letter-spacing:0.18em;color:#4A3A22;text-transform:uppercase;margin-bottom:2px;">${l}</div><div style="font-size:14px;color:${v?'#D8C8A0':'#3A2E1A'};">${esc(v||'—')}</div></div>`).join('');
+  const fillArg=JSON.stringify({company:r.company||'',wine:r.wine||'',varietal:r.varietal||'',vintage:r.vintage||'',region:r.region||'',rPrice:r.rPrice||'',mevushal:r.mevushal||'N',drinkFrom:r.drinkFrom||'',drinkUntil:r.drinkUntil||'',notes:r.notes||''});
+  G('lookup-body').innerHTML=`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:18px;">
+      <span style="font-size:12px;letter-spacing:0.15em;color:#C9944A;text-transform:uppercase;">✦ Wine found</span>
+      <span style="margin-left:auto;font-size:10px;color:#4A3A22;background:#1E1810;padding:2px 8px;border-radius:3px;">via ${esc(r.source||'AI')}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">${rows}</div>
+    ${r.notes?`<div style="background:#0A0806;border-radius:6px;padding:10px 12px;margin-bottom:14px;"><div style="font-size:9px;letter-spacing:0.18em;color:#4A3A22;text-transform:uppercase;margin-bottom:4px;">Tasting Notes</div><div style="font-size:13px;color:#A89878;line-height:1.6;">${esc(r.notes)}</div></div>`:''}
+    ${r.confidence==='low'?`<div style="font-size:11px;color:#7A6040;background:#1A1408;border:1px solid #2A2010;border-radius:4px;padding:8px 10px;margin-bottom:14px;">⚠ Low confidence — please verify before saving</div>`:''}
+    <div style="display:flex;gap:10px;">
+      <button onclick='prefillForm(${fillArg.replace(/'/g,"&#39;")})' style="flex:1;background:#C9944A;color:#0A0806;border:none;border-radius:6px;padding:12px;font-size:14px;cursor:pointer;font-weight:bold;font-family:Georgia,serif;">Fill form with this data</button>
+      <button onclick="closeLookup()" style="background:transparent;border:1px solid #2A2018;border-radius:6px;padding:12px 16px;color:#6A5A3C;cursor:pointer;font-size:14px;font-family:Georgia,serif;">Cancel</button>
+    </div>`;
+}
+function closeLookup(){G('lookup').style.display='none';}
+
+
+// ══ IMPORT ════════════════════════════════════════════════════════════════
+async function handleImportFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = ''; // reset so same file can be re-imported
+
+  // Show loading modal
+  G('import-modal').style.display = 'flex';
+  G('import-body').innerHTML = `
+    <div style="text-align:center;padding:28px 0;">
+      <div style="width:38px;height:38px;border:2px solid #C9944A;border-top-color:transparent;border-radius:50%;margin:0 auto 16px;animation:spin 0.8s linear infinite;"></div>
+      <div style="color:#C9944A;font-size:14px;letter-spacing:0.08em;">Reading "${esc(file.name)}"…</div>
+      <div style="color:#4A3A22;font-size:12px;margin-top:6px;">Grouping wines and counting bottles</div>
+    </div>`;
+
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch('/api/import', { method: 'POST', body: fd });
+    const d = await r.json();
+
+    if (!r.ok) {
+      G('import-body').innerHTML = `
+        <div style="text-align:center;padding:20px 0;">
+          <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
+          <div style="font-size:16px;color:#CC7070;margin-bottom:8px;">Import failed</div>
+          <div style="font-size:13px;color:#5A4A2C;margin-bottom:20px;">${esc(d.error||'Unknown error')}</div>
+          <button onclick="G('import-modal').style.display='none'" style="background:#C9944A;color:#0A0806;border:none;border-radius:6px;padding:12px 24px;font-size:14px;cursor:pointer;font-weight:bold;font-family:Georgia,serif;">OK</button>
+        </div>`;
+      return;
+    }
+
+    // Merge into local state
+    let added = 0, updated = 0;
+    for (const w of d.wines) {
+      const idx = wines.findIndex(x => x.id === w.id);
+      if (idx >= 0) { wines[idx] = w; updated++; }
+      else { wines.unshift(w); added++; }
+    }
+    for (const o of d.opened) {
+      if (!opened.find(x => x.id === o.id)) opened.unshift(o);
+    }
+
+    // Show success summary with preview of what was imported
+    const preview = d.wines.slice(0, 6).map(w =>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1E1710;">
+        <div>
+          <div style="font-size:14px;color:#EAE0CF;">${esc(w.company)} ${esc(w.wine)}</div>
+          <div style="font-size:11px;color:#5A4A2C;">${esc(w.varietal)}${w.vintage?' · '+esc(w.vintage):''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:12px;">
+          <div style="font-size:13px;color:#C9944A;">${(Number(w.qty1)||0)+(Number(w.qty2)||0)+(Number(w.qty3)||0)} bottles</div>
+          ${w.mevushal==='Y'?'<div style="font-size:9px;color:#7AACCC;text-transform:uppercase;letter-spacing:0.1em;">Mev</div>':''}
+        </div>
+      </div>`
+    ).join('');
+
+    const moreCount = d.wines.length > 6 ? d.wines.length - 6 : 0;
+
+    G('import-body').innerHTML = `
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:32px;margin-bottom:10px;">✅</div>
+        <div style="font-size:18px;color:#EAE0CF;margin-bottom:6px;">Import complete</div>
+        <div style="font-size:13px;color:#6A5A3C;">
+          <strong style="color:#C9944A;">${d.winesImported}</strong> wines imported
+          ${d.openedImported > 0 ? ` · <strong style="color:#C9944A;">${d.openedImported}</strong> opened entries` : ''}
+        </div>
+      </div>
+      <div style="background:#0A0806;border-radius:8px;padding:4px 12px;margin-bottom:18px;">
+        ${preview}
+        ${moreCount > 0 ? `<div style="font-size:12px;color:#4A3A22;padding:8px 0;text-align:center;">…and ${moreCount} more</div>` : ''}
+      </div>
+      <button onclick="closeImportModal()" style="width:100%;background:#C9944A;color:#0A0806;border:none;border-radius:6px;padding:13px;font-size:15px;cursor:pointer;font-weight:bold;font-family:Georgia,serif;">View My Cellar</button>`;
+
+  } catch(e) {
+    G('import-body').innerHTML = `
+      <div style="text-align:center;padding:20px 0;">
+        <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
+        <div style="font-size:16px;color:#CC7070;margin-bottom:8px;">Import failed</div>
+        <div style="font-size:13px;color:#5A4A2C;margin-bottom:20px;">${esc(e.message)}</div>
+        <button onclick="G('import-modal').style.display='none'" style="background:#C9944A;color:#0A0806;border:none;border-radius:6px;padding:12px 24px;font-size:14px;cursor:pointer;font-weight:bold;font-family:Georgia,serif;">OK</button>
+      </div>`;
+  }
+}
+
+function closeImportModal() {
+  G('import-modal').style.display = 'none';
+  renderList();
+}
+
+let tt;
+function showToast(msg,kind='ok'){
+  const t=G('toast');
+  t.textContent=msg;
+  t.style.background=kind==='err'?'#220E0E':'#0E1E0E';
+  t.style.border=`1px solid ${kind==='err'?'#4A1E1E':'#1E3E1E'}`;
+  t.style.color=kind==='err'?'#CC7070':'#70CC70';
+  t.style.display='block';
+  clearTimeout(tt); tt=setTimeout(()=>t.style.display='none',2800);
+}
+</script>
+</body>
+</html>
