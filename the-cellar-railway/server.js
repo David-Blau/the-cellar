@@ -172,6 +172,67 @@ app.get('/api/barcode/:code', async (req, res) => {
   } catch (e) { res.json({ found: false, name: '' }); }
 });
 
+// ── API: Photo label recognition (vision) ─────────────────────────────────
+app.post('/api/photo-lookup', upload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No photo uploaded.' });
+
+    let anthKey = process.env.ANTHROPIC_API_KEY || '';
+    if (!anthKey) {
+      const r = await pool.query("SELECT value FROM settings WHERE key='anthropic_key'");
+      if (r.rows.length > 0) anthKey = r.rows[0].value;
+    }
+    if (!anthKey) return res.status(400).json({ error: 'No Anthropic API key configured.' });
+
+    const base64 = req.file.buffer.toString('base64');
+    const mediaType = req.file.mimetype || 'image/jpeg';
+
+    const prompt = `You are a kosher wine expert with excellent vision. Look carefully at this wine bottle label photo.
+
+Extract all information visible on the label and return ONLY valid JSON (no markdown, no explanation) with these exact fields:
+{"company":"winery/producer brand name","wine":"wine line or label name (not the varietal)","varietal":"grape varietal","vintage":"year as string or empty","region":"country or wine region","rPrice":"retail price as number string or empty","mevushal":"Y or N","drinkFrom":"earliest drink year or empty","drinkUntil":"latest drink year or empty","notes":"brief tasting notes if on label or from your knowledge","confidence":"high/medium/low","source":"label"}
+
+Rules:
+- company = the winery/producer (e.g. Barkan, Yatir, Psagot, Hagafen, Golan Heights Winery)
+- wine = the label/line name (e.g. Superieur, Forest, Peak, Merlot Reserve) — NOT the grape
+- varietal = the grape variety shown on label
+- Israeli wines are almost always Mevushal unless it's a boutique winery
+- If something isn't visible on the label, leave it as empty string
+- confidence: high if label is clear and you can read it well, low if blurry or partial`;
+
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 800,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: mediaType, data: base64 }
+            },
+            { type: 'text', text: prompt }
+          ]
+        }]
+      })
+    });
+
+    const d = await r.json();
+    const txt = d.content?.find(b => b.type === 'text')?.text || '{}';
+    const result = JSON.parse(txt.replace(/```json|```/g, '').trim());
+    res.json(result);
+  } catch (e) {
+    console.error('Photo lookup error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── API: Bulk import from xlsx/csv ─────────────────────────────────────────
 app.post('/api/import', upload.single('file'), async (req, res) => {
   try {

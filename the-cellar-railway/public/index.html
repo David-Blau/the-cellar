@@ -90,6 +90,15 @@ select option{background:#14100C;color:#E8DFD0;}
         </svg>
         <span class="hmob">Scan</span>
       </button>
+      <!-- Hidden photo input -->
+      <input type="file" id="photo-capture" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoCapture(this)"/>
+      <button onclick="document.getElementById('photo-capture').click()" title="Photograph bottle label" style="display:flex;align-items:center;gap:6px;background:#1E1810;border:1px solid #2A2018;border-radius:6px;padding:9px 14px;color:#C9944A;cursor:pointer;font-size:13px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+        <span class="hmob">Photo</span>
+      </button>
       <!-- Hidden file input for import -->
       <input type="file" id="import-file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleImportFile(this)"/>
       <button onclick="document.getElementById('import-file').click()" title="Import from Excel/CSV" style="display:flex;align-items:center;gap:6px;background:#1E1810;border:1px solid #2A2018;border-radius:6px;padding:9px 14px;color:#C9944A;cursor:pointer;font-size:13px;">
@@ -431,7 +440,16 @@ function renderForm(){
   G('main').innerHTML=`
     <button onclick="goBack()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#5A4A2C;cursor:pointer;font-size:13px;margin-bottom:20px;padding:0;font-family:Georgia,serif;">← Back</button>
     <div style="font-size:20px;color:#C9944A;letter-spacing:0.1em;margin-bottom:20px;">${isEdit?'Edit Wine':'Add to Cellar'}</div>
-    ${!isEdit?`<button onclick="openScanner()" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#1E1810;border:1px solid #C9944A;border-radius:6px;padding:12px;color:#C9944A;cursor:pointer;font-size:13px;width:100%;margin-bottom:20px;font-family:Georgia,serif;">📷 Scan barcode to auto-fill</button>`:''}
+    ${!isEdit?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
+      <button onclick="openScanner()" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#1E1810;border:1px solid #C9944A;border-radius:6px;padding:12px;color:#C9944A;cursor:pointer;font-size:13px;font-family:Georgia,serif;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 9V5a2 2 0 012-2h4M3 15v4a2 2 0 002 2h4M15 3h4a2 2 0 012 2v4M15 21h4a2 2 0 002-2v-4"/><line x1="7" y1="7" x2="7" y2="17"/><line x1="10" y1="7" x2="10" y2="17"/><line x1="13" y1="7" x2="13" y2="17"/><line x1="16" y1="9" x2="16" y2="15"/></svg>
+        Scan barcode
+      </button>
+      <button onclick="document.getElementById('photo-capture').click()" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#1E1810;border:1px solid #C9944A;border-radius:6px;padding:12px;color:#C9944A;cursor:pointer;font-size:13px;font-family:Georgia,serif;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        📷 Photo the label
+      </button>
+    </div>`:''}
     <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
       ${fld('Company *',`<input value="${esc(f.company)}" placeholder="Barkan" oninput="formData.company=this.value" ${istyle()}>`)}
       ${fld('Wine Name *',`<input value="${esc(f.wine)}" placeholder="Superieur" oninput="formData.wine=this.value" ${istyle()}>`)}
@@ -666,6 +684,32 @@ function showLookupResult(r){
 }
 function closeLookup(){G('lookup').style.display='none';}
 
+
+
+// ══ PHOTO LABEL RECOGNITION ════════════════════════════════════════════════
+async function handlePhotoCapture(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+
+  // Make sure we're in the add form
+  if (view !== 'form') { openAdd(); }
+
+  showLookupLoading('Reading bottle label…');
+
+  try {
+    const fd = new FormData();
+    fd.append('photo', file);
+    const r = await fetch('/api/photo-lookup', { method: 'POST', body: fd });
+    const d = await r.json();
+
+    if (!r.ok) { showLookupNotFound(d.error || 'Could not read the label.'); return; }
+    if (d && d.company) showLookupResult(d);
+    else showLookupNotFound('Could not read enough info from the label.');
+  } catch(e) {
+    showLookupNotFound(e.message);
+  }
+}
 
 // ══ IMPORT ════════════════════════════════════════════════════════════════
 async function handleImportFile(input) {
