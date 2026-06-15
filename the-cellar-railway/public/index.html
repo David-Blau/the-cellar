@@ -50,14 +50,14 @@ select option{background:#14100C;color:#E8DFD0;}
   <div style="font-size:10px;letter-spacing:0.22em;color:#4A3A20;text-transform:uppercase;margin-bottom:28px;">First-time setup</div>
   <div style="width:100%;max-width:460px;">
     <div style="font-size:13px;color:#6A5A3C;margin-bottom:22px;line-height:1.7;text-align:center;">
-      Enter your Anthropic API key to enable AI wine lookup.<br/>
+      Enter your free Google Gemini API key to enable AI wine lookup with live Google Search.<br/>
       <span style="color:#4A3A22;font-size:12px;">Your cellar data is stored automatically in the Railway database.</span>
     </div>
     <div style="margin-bottom:16px;">
-      <div style="font-size:10px;letter-spacing:0.18em;color:#5A4A2C;text-transform:uppercase;margin-bottom:6px;">Anthropic API Key</div>
-      <input id="setup-anth-key" type="password" placeholder="sk-ant-..."
+      <div style="font-size:10px;letter-spacing:0.18em;color:#5A4A2C;text-transform:uppercase;margin-bottom:6px;">Google Gemini API Key (Free)</div>
+      <input id="setup-anth-key" type="password" placeholder="AIza..."
         style="width:100%;background:#14100C;border:1px solid #251E14;border-radius:6px;padding:11px 14px;color:#E8DFD0;font-size:14px;"/>
-      <div style="font-size:11px;color:#3A2E1A;margin-top:4px;">Get a free key at console.anthropic.com → API Keys</div>
+      <div style="font-size:11px;color:#3A2E1A;margin-top:4px;">Get a free key at <strong style="color:#6A5A3C;">aistudio.google.com</strong> → Get API Key → completely free, no credit card</div>
     </div>
     <button onclick="saveSetup()" style="width:100%;background:#C9944A;color:#0A0806;border:none;border-radius:6px;padding:14px;font-size:15px;cursor:pointer;font-weight:bold;margin-bottom:10px;">
       Open My Cellar
@@ -215,7 +215,7 @@ const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
 async function saveSetup(){
   const key=G('setup-anth-key').value.trim();
   if(key){
-    await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:'anthropic_key',value:key})});
+    await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:'gemini_key',value:key})});
   }
   boot();
 }
@@ -654,7 +654,7 @@ function showLookupLoading(msg){
   G('lookup-body').innerHTML=`<div style="text-align:center;padding:30px 0;">
     <div style="width:38px;height:38px;border:2px solid #C9944A;border-top-color:transparent;border-radius:50%;margin:0 auto 16px;animation:spin 0.8s linear infinite;"></div>
     <div style="color:#C9944A;font-size:14px;letter-spacing:0.08em;">${esc(msg)}</div>
-    <div style="color:#4A3A22;font-size:12px;margin-top:6px;">Checking kosherwine.com &amp; royalwine.com</div>
+    <div style="color:#4A3A22;font-size:12px;margin-top:6px;">Searching Google + kosherwine.com &amp; royalwine.com</div>
   </div>`;
 }
 function showLookupNotFound(err){

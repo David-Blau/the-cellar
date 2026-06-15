@@ -117,46 +117,63 @@ app.post('/api/settings', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── AI proxy (keeps API key server-side, never exposed to browser) ─────────
+// ── Helper: get Gemini key ─────────────────────────────────────────────────
+async function getGeminiKey() {
+  let key = process.env.GEMINI_API_KEY || '';
+  if (!key) {
+    const r = await pool.query("SELECT value FROM settings WHERE key='gemini_key'");
+    if (r.rows.length > 0) key = r.rows[0].value;
+  }
+  return key;
+}
+
+// ── Helper: call Gemini ────────────────────────────────────────────────────
+async function callGemini(parts, useSearch = true) {
+  const key = await getGeminiKey();
+  if (!key) throw new Error('No Gemini API key configured.');
+
+  const body = {
+    contents: [{ parts }],
+    generationConfig: { temperature: 0.1, maxOutputTokens: 1024 }
+  };
+  if (useSearch) body.tools = [{ google_search: {} }];
+
+  const r = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+  const d = await r.json();
+  if (d.error) throw new Error(d.error.message);
+
+  // Extract text parts only (skip search result parts)
+  const txt = d.candidates?.[0]?.content?.parts
+    ?.filter(p => p.text)
+    ?.map(p => p.text)
+    ?.join('') || '{}';
+
+  return JSON.parse(txt.replace(/```json|```/g, '').trim());
+}
+
+// ── API: Text wine lookup with Google Search ───────────────────────────────
 app.post('/api/lookup', async (req, res) => {
   try {
     const { query } = req.body;
+    const prompt = `You are a kosher wine expert. Search Google for this wine: "${query}"
 
-    // Get API key from DB or environment
-    let anthKey = process.env.ANTHROPIC_API_KEY || '';
-    if (!anthKey) {
-      const r = await pool.query("SELECT value FROM settings WHERE key='anthropic_key'");
-      if (r.rows.length > 0) anthKey = r.rows[0].value;
-    }
-    if (!anthKey) return res.status(400).json({ error: 'No Anthropic API key configured.' });
+Search kosherwine.com and royalwine.com and any other wine sites for information.
 
-    const prompt = `You are a kosher wine expert. Look up this wine on kosherwine.com and royalwine.com.
-Wine: "${query}"
-Return ONLY valid JSON (no markdown) with these exact fields:
-{"company":"winery brand name","wine":"label/line name (not the varietal)","varietal":"grape varietal","vintage":"year string or empty","region":"country","rPrice":"retail price as number string or empty","mevushal":"Y or N","drinkFrom":"year string or empty","drinkUntil":"year string or empty","notes":"1-2 sentence tasting notes","confidence":"high/medium/low","source":"kosherwine.com or royalwine.com or unknown"}
-Rules: company=brand (Barkan/Psagot/Yatir/Hagafen). wine=label (Superieur/Forest/Peak/Cellar Reserve). Israeli wines are almost always Mevushal.`;
+Return ONLY valid JSON (no markdown, no explanation):
+{"company":"winery brand name","wine":"label/line name (not the varietal)","varietal":"grape varietal","vintage":"year string or empty","region":"country","rPrice":"retail price as number string or empty","mevushal":"Y or N","drinkFrom":"earliest drink year or empty","drinkUntil":"latest drink year or empty","notes":"1-2 sentence tasting notes","confidence":"high/medium/low","source":"kosherwine.com or royalwine.com or web search"}
 
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 800,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const d = await r.json();
-    const txt = d.content?.find(b => b.type === 'text')?.text || '{}';
-    const result = JSON.parse(txt.replace(/```json|```/g, '').trim());
+Rules: company=brand only (Barkan/Psagot/Yatir/Hagafen). wine=label name (Superieur/Forest/Peak). Israeli wines are almost always Mevushal.`;
+
+    const result = await callGemini([{ text: prompt }], true);
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
+
 
 // ── Barcode UPC proxy (avoids CORS in browser) ─────────────────────────────
 app.get('/api/barcode/:code', async (req, res) => {
@@ -172,60 +189,32 @@ app.get('/api/barcode/:code', async (req, res) => {
   } catch (e) { res.json({ found: false, name: '' }); }
 });
 
-// ── API: Photo label recognition (vision) ─────────────────────────────────
+// ── API: Photo label recognition — Gemini vision + Google Search ───────────
 app.post('/api/photo-lookup', upload.single('photo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No photo uploaded.' });
 
-    let anthKey = process.env.ANTHROPIC_API_KEY || '';
-    if (!anthKey) {
-      const r = await pool.query("SELECT value FROM settings WHERE key='anthropic_key'");
-      if (r.rows.length > 0) anthKey = r.rows[0].value;
-    }
-    if (!anthKey) return res.status(400).json({ error: 'No Anthropic API key configured.' });
-
     const base64 = req.file.buffer.toString('base64');
-    const mediaType = req.file.mimetype || 'image/jpeg';
+    const mimeType = req.file.mimetype || 'image/jpeg';
 
-    const prompt = `You are a kosher wine expert with excellent vision. Look carefully at this wine bottle label photo.
+    const prompt = `You are a kosher wine expert. Look carefully at this wine bottle label photo.
 
-Extract all information visible on the label and return ONLY valid JSON (no markdown, no explanation) with these exact fields:
-{"company":"winery/producer brand name","wine":"wine line or label name (not the varietal)","varietal":"grape varietal","vintage":"year as string or empty","region":"country or wine region","rPrice":"retail price as number string or empty","mevushal":"Y or N","drinkFrom":"earliest drink year or empty","drinkUntil":"latest drink year or empty","notes":"brief tasting notes if on label or from your knowledge","confidence":"high/medium/low","source":"label"}
+First read everything visible on the label. Then search Google to find more details about this specific wine on kosherwine.com, royalwine.com, or other wine sites — especially for price, drink window, and tasting notes.
+
+Return ONLY valid JSON (no markdown, no explanation):
+{"company":"winery/producer brand name","wine":"wine line or label name (not the varietal)","varietal":"grape varietal","vintage":"year as string or empty","region":"country or wine region","rPrice":"retail price as number string or empty","mevushal":"Y or N","drinkFrom":"earliest drink year or empty","drinkUntil":"latest drink year or empty","notes":"tasting notes from label or web search","confidence":"high/medium/low","source":"label + web search"}
 
 Rules:
-- company = the winery/producer (e.g. Barkan, Yatir, Psagot, Hagafen, Golan Heights Winery)
-- wine = the label/line name (e.g. Superieur, Forest, Peak, Merlot Reserve) — NOT the grape
-- varietal = the grape variety shown on label
-- Israeli wines are almost always Mevushal unless it's a boutique winery
-- If something isn't visible on the label, leave it as empty string
-- confidence: high if label is clear and you can read it well, low if blurry or partial`;
+- company = winery/producer (e.g. Barkan, Yatir, Psagot, Hagafen, Golan Heights Winery)
+- wine = label/line name (e.g. Superieur, Forest, Peak, Reserve) — NOT the grape variety
+- Israeli wines are almost always Mevushal unless clearly boutique
+- confidence: high if label is clear and confirmed by web, low if blurry or uncertain`;
 
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 800,
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: mediaType, data: base64 }
-            },
-            { type: 'text', text: prompt }
-          ]
-        }]
-      })
-    });
+    const result = await callGemini([
+      { inline_data: { mime_type: mimeType, data: base64 } },
+      { text: prompt }
+    ], true);
 
-    const d = await r.json();
-    const txt = d.content?.find(b => b.type === 'text')?.text || '{}';
-    const result = JSON.parse(txt.replace(/```json|```/g, '').trim());
     res.json(result);
   } catch (e) {
     console.error('Photo lookup error:', e);
